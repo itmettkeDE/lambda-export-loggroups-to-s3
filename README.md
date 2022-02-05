@@ -26,7 +26,9 @@ keep on running until all log groups were exported.
             "Action": [
                 "logs:CreateExportTask",
                 "logs:DescribeExportTasks",
-                "logs:DescribeLogGroups"
+                "logs:DescribeLogGroups",
+                "logs:DescribeLogStreams",
+                "logs:ListTagsLogGroup"
             ],
             "Resource": "*"
         },{
@@ -135,10 +137,22 @@ The `bucket_prefix` allows these variables:
 
 ### Event
 
-```json
+```js
 {
     "bucket": "<bucket_name>",
-    "prefix": "<bucket_prefix>"
+    "prefix": "<bucket_prefix>",
+    // Optional, skip if not required. Example: `tag1=value1,tag2=value2`
+    // Only include cloudwatch groups with the given tags and values
+    "include_tags": [{
+        "name": "",
+        "value": ""
+    }],
+    // Optional, skip if not required. Example: `tag1=value1,tag2=value2`
+    // Exclude cloudwatch groups with the given tags and values
+    "exclude_tags": [{
+        "name": "",
+        "value": ""
+    }]
 }
 ```
 
@@ -149,6 +163,12 @@ PREFIX="<bucket_prefix>"
 # Optional, skip if not required. off | error | warn | info (default) | debug | trace
 # Defines the log level
 LOG_LEVEL=""
+# Optional, skip if not required. Example: `tag1=value1,tag2=value2`
+# Only include cloudwatch groups with the given tags and values
+INCLUDE_TAGS=""
+# Optional, skip if not required. Example: `tag1=value1,tag2=value2`
+# Exclude cloudwatch groups with the given tags and values
+EXCLUDE_TAGS=""
 ```
 
 License: MIT OR Apache-2.0

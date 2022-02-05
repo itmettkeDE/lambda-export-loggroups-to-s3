@@ -46,6 +46,28 @@ impl Logs {
         Ok(groups)
     }
 
+    pub(crate) async fn get_tags(
+        &self,
+        group_name: &str,
+    ) -> anyhow::Result<std::collections::HashMap<String, String>> {
+        use anyhow::Context;
+        use rusoto_logs::CloudWatchLogs;
+
+        loop {
+            let res = self
+                .client
+                .list_tags_log_group(rusoto_logs::ListTagsLogGroupRequest {
+                    log_group_name: group_name.into(),
+                })
+                .await;
+            if super::is_wait_and_repeat(&res).await {
+                continue;
+            }
+            let res = res.context("Unable to fetch log groups")?;
+            break Ok(res.tags.unwrap_or_default());
+        }
+    }
+
     pub(crate) async fn get_last_event_timestamp(
         &self,
         group_name: &str,

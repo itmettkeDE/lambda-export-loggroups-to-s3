@@ -24,7 +24,9 @@
 //!             "Action": [
 //!                 "logs:CreateExportTask",
 //!                 "logs:DescribeExportTasks",
-//!                 "logs:DescribeLogGroups"
+//!                 "logs:DescribeLogGroups",
+//!                 "logs:DescribeLogStreams",
+//!                 "logs:ListTagsLogGroup"
 //!             ],
 //!             "Resource": "*"
 //!         },{
@@ -133,10 +135,22 @@
 //!
 //! ## Event
 //!
-//! ```json
+//! ```js
 //! {
 //!     "bucket": "<bucket_name>",
-//!     "prefix": "<bucket_prefix>"
+//!     "prefix": "<bucket_prefix>",
+//!     // Optional, skip if not required. Example: `tag1=value1,tag2=value2`
+//!     // Only include cloudwatch groups with the given tags and values
+//!     "include_tags": [{
+//!         "name": "",
+//!         "value": ""
+//!     }],
+//!     // Optional, skip if not required. Example: `tag1=value1,tag2=value2`
+//!     // Exclude cloudwatch groups with the given tags and values
+//!     "exclude_tags": [{
+//!         "name": "",
+//!         "value": ""
+//!     }]
 //! }
 //! ```
 //!
@@ -147,6 +161,12 @@
 //! # Optional, skip if not required. off | error | warn | info (default) | debug | trace
 //! # Defines the log level
 //! LOG_LEVEL=""
+//! # Optional, skip if not required. Example: `tag1=value1,tag2=value2`
+//! # Only include cloudwatch groups with the given tags and values
+//! INCLUDE_TAGS=""
+//! # Optional, skip if not required. Example: `tag1=value1,tag2=value2`
+//! # Exclude cloudwatch groups with the given tags and values
+//! EXCLUDE_TAGS=""
 //! ```
 
 #![deny(clippy::all, clippy::nursery)]
@@ -161,6 +181,8 @@ const TEST_DATA: &str = include_str!("../test.json");
 const ENV_VAR_LOG_LEVEL: &str = "LOG_LEVEL";
 const ENV_VAR_BUCKET: &str = "BUCKET";
 const ENV_VAR_PREFIX: &str = "PREFIX";
+const ENV_VAR_INCLUDE_TAGS: &str = "INCLUDE_TAGS";
+const ENV_VAR_EXCLUDE_TAGS: &str = "EXCLUDE_TAGS";
 
 const EXPORT_TASK_PREFIX: &str = "AUTO-EXPORT-";
 
@@ -252,6 +274,8 @@ impl lambda_runtime_types::Runner<(), event::Event, ()> for Runner {
 
         let bucket = event.get_bucket()?;
         let prefix = prefix.replace("{region}", region);
+        let include_tags = event.get_include_tags()?;
+        let exclude_tags = event.get_exclude_tags()?;
 
         let region = rusoto_core::Region::from_str(region)
             .with_context(|| format!("Invalid region: {}", region))?;
@@ -292,6 +316,30 @@ impl lambda_runtime_types::Runner<(), event::Event, ()> for Runner {
                 break;
             }
             println!("Querying info for LogGroup {}", group);
+            if include_tags.is_some() || exclude_tags.is_some() {
+                let tags = cloudwatch.get_tags(&group).await?;
+                if let Some(ref include_tags) = include_tags {
+                    if !include_tags
+                        .iter()
+                        .any(|tag| tags.get(&tag.name) == Some(&tag.value))
+                    {
+                        println!("Skipping LogGroup {} as it is missing required tags", group);
+                        continue;
+                    }
+                }
+                if let Some(ref exclude_tags) = exclude_tags {
+                    if exclude_tags
+                        .iter()
+                        .any(|tag| tags.get(&tag.name) == Some(&tag.value))
+                    {
+                        println!(
+                            "Skipping LogGroup {} as has a tag on the excluded lists",
+                            group
+                        );
+                        continue;
+                    }
+                }
+            }
             if cloudwatch
                 .get_last_event_timestamp(&group)
                 .await?
