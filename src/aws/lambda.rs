@@ -40,6 +40,7 @@ impl Lambda {
             if res.status == Some(202) {
                 return Ok(());
             }
+            tokio::time::sleep(tokio::time::Duration::from_millis(250)).await
         }
     }
 }
