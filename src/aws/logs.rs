@@ -46,6 +46,42 @@ impl Logs {
         Ok(groups)
     }
 
+    pub(crate) async fn get_last_event_timestamp(
+        &self,
+        group_name: &str,
+    ) -> anyhow::Result<Option<i64>> {
+        use anyhow::Context;
+        use rusoto_logs::CloudWatchLogs;
+
+        let mut next_token = None;
+        loop {
+            let res = self
+                .client
+                .describe_log_streams(rusoto_logs::DescribeLogStreamsRequest {
+                    descending: Some(true),
+                    log_group_name: group_name.into(),
+                    next_token: next_token.clone(),
+                    order_by: Some("LastEventTime".into()),
+                    ..rusoto_logs::DescribeLogStreamsRequest::default()
+                })
+                .await;
+            if super::is_wait_and_repeat(&res).await {
+                continue;
+            }
+            let res = res.context("Unable to fetch log streams")?;
+            for stream in res.log_streams.unwrap_or_default() {
+                if let Some(timestamp) = stream.last_event_timestamp {
+                    return Ok(Some(timestamp));
+                }
+            }
+            if let Some(token) = res.next_token {
+                next_token = Some(token);
+                continue;
+            }
+            return Ok(None);
+        }
+    }
+
     pub(crate) async fn get_export_tasks(&self) -> anyhow::Result<Vec<rusoto_logs::ExportTask>> {
         use anyhow::Context;
         use rusoto_logs::CloudWatchLogs;

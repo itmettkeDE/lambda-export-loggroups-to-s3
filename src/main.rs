@@ -291,6 +291,17 @@ impl lambda_runtime_types::Runner<(), event::Event, ()> for Runner {
                     .await?;
                 break;
             }
+            println!("Querying info for LogGroup {}", group);
+            if cloudwatch
+                .get_last_event_timestamp(&group)
+                .await?
+                .map(|t| t < export_start.timestamp_millis())
+                .unwrap_or(true)
+            {
+                println!("Skipping LogGroup {} due to no new log entries", group);
+                continue;
+            }
+
             println!("Trying to create export for LogGroup {}", group);
             let prefix = prefix.replace("{group}", &group);
             let task_name = generate_task_name();
