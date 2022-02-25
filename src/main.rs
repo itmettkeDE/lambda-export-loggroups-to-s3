@@ -351,7 +351,7 @@ impl lambda_runtime_types::Runner<(), event::Event, ()> for Runner {
             }
 
             println!("Trying to create export for LogGroup {}", group);
-            let prefix = prefix.replace("{group}", &group);
+            let prefix = prefix.replace("{group}", group.trim_start_matches('/'));
             let task_name = generate_task_name();
             let task_id = cloudwatch
                 .create_export_tasks(
