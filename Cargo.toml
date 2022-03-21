@@ -18,7 +18,7 @@ test = ["lambda-runtime-types/test"]
 anyhow = "1"
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
-lambda-runtime-types = { version = "0.5", default-features = false }
+lambda-runtime-types = { version = "0.6", default-features = false }
 log = "0.4"
 rand = "0.8"
 rusoto_core = "0.47"
