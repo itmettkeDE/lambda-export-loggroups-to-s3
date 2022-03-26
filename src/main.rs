@@ -239,12 +239,10 @@ impl ExportTask {
 }
 
 #[async_trait::async_trait]
-impl lambda_runtime_types::Runner<(), event::Event, ()> for Runner {
-    async fn run<'a>(
+impl<'a> lambda_runtime_types::Runner<'a, (), event::Event, ()> for Runner {
+    async fn run(
         _shared: &'a (),
-        event: event::Event,
-        region: &'a str,
-        ctx: lambda_runtime_types::Context,
+        event: lambda_runtime_types::LambdaEvent<'a, event::Event>,
     ) -> anyhow::Result<()> {
         use anyhow::Context;
         use chrono::Datelike;
@@ -255,7 +253,7 @@ impl lambda_runtime_types::Runner<(), event::Event, ()> for Runner {
         let end_time_local = invoke_time_local + chrono::Duration::minutes(10);
 
         // Start and end time of backup process
-        let invoke_time_backup = event.invoke_time.unwrap_or(invoke_time_local);
+        let invoke_time_backup = event.event.invoke_time.unwrap_or(invoke_time_local);
         let end_time_backup =
             invoke_time_backup + chrono::Duration::days(1) - chrono::Duration::minutes(5);
 
@@ -267,18 +265,19 @@ impl lambda_runtime_types::Runner<(), event::Event, ()> for Runner {
         let export_end = chrono::NaiveDateTime::new(export_date, export_end_time);
 
         let prefix = event
+            .event
             .get_prefix()?
             .replace("{year}", &format!("{:02}", export_date.year()))
             .replace("{month}", &format!("{:02}", export_date.month()))
             .replace("{day}", &format!("{:02}", export_date.day()));
 
-        let bucket = event.get_bucket()?;
-        let prefix = prefix.replace("{region}", region);
-        let include_tags = event.get_include_tags()?;
-        let exclude_tags = event.get_exclude_tags()?;
+        let bucket = event.event.get_bucket()?;
+        let prefix = prefix.replace("{region}", event.region);
+        let include_tags = event.event.get_include_tags()?;
+        let exclude_tags = event.event.get_exclude_tags()?;
 
-        let region = rusoto_core::Region::from_str(region)
-            .with_context(|| format!("Invalid region: {}", region))?;
+        let region = rusoto_core::Region::from_str(event.region)
+            .with_context(|| format!("Invalid region: {}", event.region))?;
         let cloudwatch = aws::Logs::new(region.clone());
         let lambda = aws::Lambda::new(region);
 
@@ -306,10 +305,10 @@ impl lambda_runtime_types::Runner<(), event::Event, ()> for Runner {
             if now >= end_time_local {
                 lambda
                     .invoke_async(
-                        &ctx.invoked_function_arn,
+                        &event.ctx.invoked_function_arn,
                         &event::Event {
                             invoke_time: Some(invoke_time_backup),
-                            ..event
+                            ..event.event
                         },
                     )
                     .await?;
@@ -371,7 +370,7 @@ impl lambda_runtime_types::Runner<(), event::Event, ()> for Runner {
         Ok(())
     }
 
-    async fn setup() -> anyhow::Result<()> {
+    async fn setup(_region: &'a str) -> anyhow::Result<()> {
         use anyhow::Context;
         use std::str::FromStr;
 
