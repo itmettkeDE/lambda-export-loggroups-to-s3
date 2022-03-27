@@ -1,3 +1,5 @@
+> This Repo is not in use anymore. These functions are now available at https://github.com/itmettkeDE/lambdas
+
 # lambda-export-loggroups-to-s3
 
 This tool exports CloudWatch LogGroups to S3 once a day
